@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MDtoHTML</title>
+    <link rel="stylesheet" href="node_modules/monaco-editor/min/vs/editor/editor.main.css">
+</head>
+<body>
+
+<div style="display: flex;">
+
+    <div id="editor-container" style="width: 50%; height: 600px; border: 1px solid grey">
+    </div>
+
+    <div style="width: 50%; height: 600px; border: 1px solid grey; overflow: auto;">
+        <div>
+            <button onclick="showTab('preview')">Preview</button>
+            <button onclick="showTab('source')">HTML</button>
+
+            <button id="highlightBtn" onclick="toggleHighlight()">Highlight: ON</button>
+            <button id="downloadMarkdown" onclick="downloadHtml()">Download</button>
+        </div>
+        <div id="preview" style="display: none;"></div>
+        <div id="source" style="display: none;"></div>
+    </div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.14.0/beautify-html.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.20.0/min/vs/loader.min.js"></script>
+<script>
+    let isHighlightOn = true;
+    let editor;
+    require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.20.0/min/vs' }});
+    require(['vs/editor/editor.main'], function() {
+        editor = monaco.editor.create(document.getElementById('editor-container'), {
+            value: '### 見出し\n' +
+                '\n' +
+                'Markdownを使ってみよう\n' +
+                '============\n' +
+                '\n' +
+                'Markdonwとは？\n' +
+                '------------\n' +
+                '\n' +
+                '### 引用\n' +
+                '\n' +
+                '>Markdown（マークダウン）は、文書を記述するための軽量マークアップ言語のひとつである。\n' +
+                '>本来はプレーンテキスト形式で手軽に書いた文書からHTMLを生成するために開発されたものである。\n' +
+                '>しかし、現在ではHTMLのほかパワーポイント形式やLATEX形式のファイルへ変換する\n' +
+                '>ソフトウェア（コンバータ）も開発されている。\n' +
+                '>各コンバータの開発者によって多様な拡張が施されるため、各種の方言が存在する。\n' +
+                '\n' +
+                '\n' +
+                '### リンク\n' +
+                '\n' +
+                '[Wiki:Markdown](https://ja.wikipedia.org/wiki/Markdown):WikiのMarkdownのページ\n' +
+                '\n' +
+                '### 強調\n' +
+                '\n' +
+                '*ここがemタグで強調されます*  \n' +
+                '_ここがemタグで強調されます_  \n' +
+                '**ここがstrongタグで強調されます**  \n' +
+                '__ここがstrongタグで強調されます__  \n' +
+                '\n' +
+                '\n' +
+                '### リスト\n' +
+                '\n' +
+                '- フシギダネ\n' +
+                '- フシギソウ\n' +
+                '- フシギバナ\n' +
+                '\n' +
+                '\n' +
+                '### テーブル  \n' +
+                '\n' +
+                '| A列 | B列 | C列 |D列|E列|\n' +
+                '|-----|:---:|-----|--:|---|\n' +
+                '| あ  | い  | う  |え |お |\n' +
+                '| か  | き  | く  |け |こ |\n' +
+                '| さ  | し  | す  |せ |そ |\n' +
+                '\n' +
+                '\n' +
+                '### プログラムを記述する場合  \n' +
+                '\n' +
+                '```py\n' +
+                'def scope_test():\n' +
+                '    def do_local():\n' +
+                '        spam = "local spam"\n' +
+                '\n' +
+                '    def do_nonlocal():\n' +
+                '        nonlocal spam\n' +
+                '        spam = "nonlocal spam"\n' +
+                '\n' +
+                '    def do_global():\n' +
+                '        global spam\n' +
+                '        spam = "global spam"\n' +
+                '\n' +
+                '    spam = "test spam"\n' +
+                '    do_local()\n' +
+                '    print("After local assignment:", spam)\n' +
+                '    do_nonlocal()\n' +
+                '    print("After nonlocal assignment:", spam)\n' +
+                '    do_global()\n' +
+                '    print("After global assignment:", spam)\n' +
+                '\n' +
+                'scope_test()\n' +
+                'print("In global scope:", spam)\n' +
+                '```\n',
+
+            language: 'markdown'
+        });
+
+        editor.onDidChangeModelContent(function() {
+            updatePreview(editor.getValue());
+        });
+        updatePreview(editor.getValue());
+        document.getElementById('preview').style.display = 'block';
+    });
+    function showTab(tabName) {
+        document.getElementById('preview').style.display = 'none';
+        document.getElementById('source').style.display = 'none';
+        document.getElementById(tabName).style.display = 'block';
+    }
+    function updatePreview(markdownText) {
+        fetch('convert.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: 'markdown=' + encodeURIComponent(markdownText)
+            + '&highlight=' + (isHighlightOn ? 'True' : 'False')
+        })
+            .then(response => response.text())
+            .then(data => {
+                document.getElementById('preview').innerHTML = data;
+                document.getElementById('source').innerText = html_beautify(data, {
+                    indent_size: 2,
+                    indent_char: "\t"});
+            });
+    }
+
+    function toggleHighlight() {
+        isHighlightOn = !isHighlightOn;
+        const btn = document.getElementById('highlightBtn');
+        btn.innerText = isHighlightOn ? 'Highlight: ON' : 'Highlight: OFF';
+        updatePreview(editor.getValue());
+    }
+
+    function downloadHtml() {
+        fetch('download.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: 'html=' + encodeURIComponent(document.getElementById('source').innerText)
+        })
+            .then(response => response.blob())
+            .then(blob => {
+                const blobUrl = URL.createObjectURL(blob);
+
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = blobUrl;
+                a.download = 'converted.html';
+
+                document.body.appendChild(a);
+                a.click();
+
+                URL.revokeObjectURL(blobUrl);
+            });
+    }
+</script>
+</body>
+</html>
